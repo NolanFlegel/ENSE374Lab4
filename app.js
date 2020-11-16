@@ -1,14 +1,60 @@
 // other requires
 const express = require("express");
 const bodyParser = require("body-parser");
+const mongoose = require("mongoose")
 const fs = require("fs");
 const { runInNewContext } = require("vm");
 
 // app.use statements
 const app = express();
 
+// new requires for passport
+const session = require("express-session")
+const passport = require("passport")
+const passportLocalMongoose = require("passport-local-mongoose")
+
+// allows using dotenv for environment variables
+require("dotenv").config();
+
+// set up session
+app.use(session({
+    secret: process.env.SECRET, // stores our secret in our .env file
+    resave: false,              // other config settings explained in the docs
+    saveUninitialized: false
+}));
+
+// set up passport
+app.use(passport.initialize());
+app.use(passport.session());
+
 app.use(express.static("public"));
 app.set("view engine", "ejs");
+
+// passport needs to use MongoDB to store users
+mongoose.connect("mongodb://localhost:27017/users", 
+                {useNewUrlParser: true, // these avoid MongoDB deprecation warnings
+                 useUnifiedTopology: true});
+
+// This is the database where our users will be stored
+// Passport-local-mongoose handles these fields, (username, password), 
+// but you can add additional fields as needed
+const userSchema = new mongoose.Schema ({
+    users: String,
+    pswd: String
+})
+
+// configure passportLocalMongoose
+userSchema.plugin(passportLocalMongoose);
+
+// Collection of users
+const User = new mongoose.model("User", userSchema)
+
+// more passport-local-mongoose config
+// create a strategy for storing users with Passport
+passport.use(User.createStrategy());
+passport.serializeUser(User.serializeUser());
+passport.deserializeUser(User.deserializeUser());
+
 app.use(bodyParser.urlencoded({
     extended: true
 }));
